@@ -147,6 +147,10 @@
     <ClCompile Include="..\Thirdparty\ImGUI\imgui_widgets.cpp" />
     <ClCompile Include="client.cpp" />
   </ItemGroup>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <RuntimeDllSources>../Thirdparty/SDL2/lib/x64/*.dll;../Thirdparty/SDL2_net/lib/x64/*.dll</RuntimeDllSources>
+  </PropertyGroup>
+  <Import Project="..\CopyRuntimeDlls.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -148,6 +148,10 @@
     <ClInclude Include="timer.h" />
     <ClInclude Include="vector2.h" />
   </ItemGroup>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <RuntimeDllSources>../Thirdparty/SDL2/lib/x64/*.dll;../Thirdparty/SDL2_net/lib/x64/*.dll;../Thirdparty/SDL2_image/lib/x64/*.dll;../Thirdparty/SDL2_image/lib/x64/optional/*.dll</RuntimeDllSources>
+  </PropertyGroup>
+  <Import Project="..\CopyRuntimeDlls.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

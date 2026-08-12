@@ -144,6 +144,10 @@
   <ItemGroup>
     <ClInclude Include="game_player.pb.h" />
   </ItemGroup>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <RuntimeDllSources>../Thirdparty/Protobuf/lib/x64/*.dll</RuntimeDllSources>
+  </PropertyGroup>
+  <Import Project="..\CopyRuntimeDlls.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

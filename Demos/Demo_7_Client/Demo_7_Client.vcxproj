@@ -141,6 +141,10 @@
   <ItemGroup>
     <ClInclude Include="..\Demo_7_Common\script.h" />
   </ItemGroup>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <RuntimeDllSources>../Thirdparty/SDL2/lib/x64/*.dll</RuntimeDllSources>
+  </PropertyGroup>
+  <Import Project="..\CopyRuntimeDlls.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
