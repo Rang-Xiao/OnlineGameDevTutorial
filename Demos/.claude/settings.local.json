@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem *)",
+      "Bash(msbuild Demo_2_Server/Demo_2_Server.vcxproj /p:Configuration=Debug /p:Platform=x64)",
+      "Bash(msbuild Demo_2_Client/Demo_2_Client.vcxproj /p:Configuration=Debug /p:Platform=x64)",
+      "PowerShell(msbuild *)"
+    ]
+  }
+}

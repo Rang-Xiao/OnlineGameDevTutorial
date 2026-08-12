@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{5985af0c-3825-41af-9d88-70d162a5c702}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty">
+      <UniqueIdentifier>{b5ae7b0a-2cb3-42b8-9408-633a7c7a8777}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\protocol">
+      <UniqueIdentifier>{c9573295-2512-41ab-8cde-3994c7c214ab}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="protobuf.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="game_player.pb.cc">
+      <Filter>thirdparty\protocol</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="game_player.proto">
+      <Filter>thirdparty\protocol</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="game_player.pb.h">
+      <Filter>thirdparty\protocol</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

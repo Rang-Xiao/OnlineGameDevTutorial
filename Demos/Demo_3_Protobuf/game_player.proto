@@ -1,0 +1,20 @@
+// game_player.proto
+syntax = "proto3";
+
+package game;
+
+message Vec3 {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+message GamePlayer {
+    int32 player_id = 1;
+    string player_name = 2;
+    Vec3 position = 3;
+    int32 health = 4;
+    int32 level = 5;
+    repeated int32 inventory = 6;           // 数组类型
+    map<string, int32> skills = 7;         // 字典类型
+}

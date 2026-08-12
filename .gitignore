@@ -1,0 +1,41 @@
+# Visual Studio build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.exp
+*.lib
+*.dll
+*.exe
+*.log
+*.tlog
+*.iobj
+*.ipdb
+*.pch
+*.res
+
+# Visual Studio user/cache files
+.vs/
+*.user
+*.suo
+*.slnLaunch.user
+*.VC.db
+*.VC.VC.opendb
+
+# Third-party sources and prebuilt libraries
+Demos/Thirdparty/
+
+# Downloaded archives / toolchains
+*.zip
+*.tar
+*.tar.gz
+*.tar.xz
+*.7z
+*.rar
+*.msi

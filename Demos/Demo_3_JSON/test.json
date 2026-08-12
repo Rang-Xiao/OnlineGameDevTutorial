@@ -1,0 +1,13 @@
+{
+	"player_id":	1001,
+	"player_name":	"Alice",
+	"health":	95,
+	"level":	7,
+	"position":	[12.5, 64, -34.25],
+	"inventory":	[101, 102, 0, 0, 205],
+	"skills":	{
+		"attack":	5,
+		"defense":	3,
+		"magic":	8
+	}
+}

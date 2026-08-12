@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{833fd020-0fcd-4364-9ecd-4e81ae7362d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty">
+      <UniqueIdentifier>{2df9b3b8-3451-428e-bddf-695dbb34b4ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\cJSON">
+      <UniqueIdentifier>{d90f9d89-fe95-421a-b243-f194743e93d5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="client.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Thirdparty\cJSON\cJSON.c">
+      <Filter>thirdparty\cJSON</Filter>
+    </ClCompile>
+    <ClCompile Include="net_manager.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="net_manager.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="atlas.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="animation.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="timer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="vector2.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
