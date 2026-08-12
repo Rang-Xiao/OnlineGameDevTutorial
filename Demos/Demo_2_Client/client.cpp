@@ -194,7 +194,7 @@ int main(int argc, char** argv)
      * 返回 0 表示成功，非 0 表示解析失败（如无效 IP 或无法解析域名）
      */
     IPaddress ip;
-    if (SDLNet_ResolveHost(&ip, "192.168.0.108", 25565))
+    if (SDLNet_ResolveHost(&ip, "10.240.189.212", 25565))
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error",
             u8"无法解析服务器地址。", window);
