@@ -31,6 +31,9 @@ x86/
 # Third-party sources and prebuilt libraries
 Demos/Thirdparty/
 
+# Engine sources
+引擎源码/
+
 # Downloaded archives / toolchains
 *.zip
 *.tar
