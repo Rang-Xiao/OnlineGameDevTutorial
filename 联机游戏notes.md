@@ -967,13 +967,262 @@ AOI 顺带解决了**透视外挂**：客户端根本没收到视野外敌人的
 
 （延迟、抖动、丢包的具体处理见 Chapter 3）
 
-
 ### Replication实战
 
+> 对应 Demo_4：服务端 `server.cpp` 每帧广播 `sync`，客户端 `client.cpp` 的 `sync` 回调重建世界
+
+客户端向服务端传操作，服务端告诉客户端实际数据，符合帧同步的思想
+
+本质都是通过rpc来做
+
+replication主要体现在对象的创建、更新、销毁生命周期上
+
+#### 数据流总览
+
+```
+客户端                              服务端
+按下 A/D
+  ↓ rpc_call("move_left", true)
+                          →  rpc_move_left() 只置标志位
+                                is_move_left = true
+                             ┌─ 每帧逻辑 ─────────────┐
+                             │ dir = right - left    │
+                             │ pos += 300 * delta*dir│
+                             │ 边界钳制 [0, 1280]     │
+                             └───────────────────────┘
+                             打包所有 Client → JSON 数组
+  sync 回调  ←  broadcast("sync", [...])
+  ↓
+建/更/删本地 Character
+```
+
+关键：**客户端一次都没有自己改过 `position`**。按键只发意图，位置永远来自服务端 —— 这就是 Server Authority 的最小实现。
+
+#### 全量快照式复制
+
+Demo_4 的 `sync` 每帧打包**所有玩家的所有字段**：
+
+```cpp
+cJSON_AddNumberToObject(json_client, "id",   client.id);      // NetID
+cJSON_AddNumberToObject(json_client, "pos",  client.pos);     // 位置
+cJSON_AddBoolToObject  (json_client, "flip", client.is_flip); // 朝向
+cJSON_AddBoolToObject  (json_client, "move", ...);            // 是否在动
+cJSON_AddStringToObject(json_client, "skin", client.skin_id); // 外观
+```
+
+对照上一节的复制策略，这是**最朴素的全量复制**：无脏标记、无增量、无 AOI。代价很直白 —— N 个玩家每帧就是 N 条完整记录，而 `skin` 这种一辈子不变的字段每帧都在重发。
+
+真实项目的改法：`skin` 只在 spawn 时发一次；`pos` 加脏标记；玩家多了再上 AOI。
+
+#### 生命周期靠"存在性"隐式推导
+
+Demo_4 没有显式的 spawn/destroy 消息，而是让客户端**对比快照**来推断：
+
+| 阶段 | 服务端 | 客户端（`sync` 回调） |
+|------|--------|----------------------|
+| **Spawn** | 新连接分配 `id_next++`，之后自然出现在数组里 | `chara_pool.find(id)` 找不到 → 新建 `Character`，按 `skin` 装载动画资源 |
+| **Update** | 每帧重算 `pos`/`flip` | 找到了 → 直接覆盖位置、切换 idle/move 动画 |
+| **Destroy** | 断线时 `client_pool.erase(id)`，此后数组里不再出现 | 本帧 `valid_id_pool` 里没有的 id → `chara_pool.erase(id)` |
+
+```cpp
+// 客户端：本帧出现过的 id 收进集合
+valid_id_pool.insert(json_id->valueint);
+...
+// 集合里没有的，说明服务端已经删了它
+for (int id : current_id_list)
+    if (valid_id_pool.find(id) == valid_id_pool.end())
+        chara_pool.erase(id);
+```
+
+**这种做法的取舍**
+
+| 优点 | 缺点 |
+|------|------|
+| 无需可靠的 spawn/destroy 消息，丢一帧也能自愈 | 每帧必须发全量，带宽随实体数线性增长 |
+| 中途加入天然正确，收到第一个 `sync` 就是完整世界 | 无法表达"死亡特效""被谁击杀"这类**事件语义**，只知道对象没了 |
+| 实现极简，逻辑集中在一个回调里 | 依赖 TCP 保证不丢包；换成 UDP 立刻失效 |
+
+一旦上了增量复制，spawn/destroy 就必须改成显式的可靠消息 —— 因为客户端再也无法通过"没出现"来判断死亡了。
+
+#### 服务端权威的两个体现
+
+1. **NetID 由服务端独占分配**：`id_next++` 在服务端自增，客户端只能通过 `set_id` 被动获知自己是谁（`client.cpp` 的 `id_self`）
+2. **外观也由服务端指定**：`skin_id = skin_list[id_skin_next++ % size]` 轮流分配，客户端无权选皮肤 —— 这个设计顺带演示了"连外观都不信任客户端"的极端形态
+
+#### 与上一节理论的对照
+
+| 理论概念 | Demo_4 的落地 | 简化之处 |
+|----------|--------------|----------|
+| NetID | `Client::id` / `Character::id` | 单调自增，未处理复用与回绕 |
+| 全量快照 | 每帧完整 JSON 数组 | 未做 delta |
+| 脏标记 | 无 | 无变化的字段照发 |
+| AOI | 无 | 全世界广播给所有人 |
+| 客户端插值 | 无，`set_position` 直接硬设 | 服务端帧率抖动会直接表现为画面顿挫 |
+| 客户端预测 | 无，按键到画面动有一个 RTT 的延迟 | 局域网感知不明显，公网会明显"手感重" |
+
+> 这也解释了为什么 Demo_4 服务端主循环是 `while(true)` 满速跑 —— 只有把广播频率顶到极限，缺失的插值才不至于露馅。真正的做法是降到 20~30 Hz + 客户端插值。
+
 ### Rpc实战
+
+> 对应 Demo_4：客户端 `net_manager.h/cpp` 封装了一个最小 RPC 框架，服务端 `server.cpp` 对称实现
+
+面试题：如果有个游戏对象的生命周期极短，处于服务器两个同步帧率之间，即如何同步极短生命周期的对象？
+
+本质是短的瞬时状态如何同步
+
+答：通过远程过程调用，类似于消息，唤起某一段的本地过程调用
+
+由于有延迟，返回值不是立即返回的，此段不可能阻塞来等待答复，所以rpc尽量避免有返回值，而是为需要返回值的场景建立异步的通道
+
+#### 为什么状态同步补不上这个洞
+
+状态同步传的是"**世界现在长什么样**"。两次快照之间发生又消失的东西，它天生表达不了：
+
+```
+tick N        子弹生成 → 命中 → 销毁        tick N+1
+   │  ←──────── 全在这 33 ms 内发生 ────────→  │
+快照：无子弹                              快照：无子弹
+```
+
+玩家看到的就是"什么都没发生，但血少了一截"。命中特效、击杀播报、技能音效、伤害飘字 —— 这些**事件（Event）**必须靠 RPC 单独送。
+
+一句话区分：**Replication 同步"状态"，RPC 传递"事件"**。前者可丢（下一帧会纠正），后者丢了就永远错过。
+
+#### 协议设计
+
+Demo_4 的 RPC 报文只有两个字段，客户端服务端完全对称：
+
+```json
+{"f":"move_left","p":true}          ← 客户端 → 服务端：意图
+{"f":"set_id","p":3}                ← 服务端 → 客户端：分配身份
+{"f":"sync","p":[{...},{...}]}      ← 服务端 → 客户端：状态广播
+```
+
+| 字段 | 含义 | 对应远程调用的 |
+|------|------|--------------|
+| `f` | function，函数名 | 调用目标 |
+| `p` | params，参数（可为任意 JSON 值） | 实参 |
+
+字段名压到单字符是有意的 —— JSON 每帧重发字段名，`"function"` 比 `"f"` 每条多 7 字节，广播给 32 人再乘 60 帧就很可观了（呼应 Chapter 2 里"MsgPack 体积打不过 Protobuf"的同一个原因）。
+
+**注意：没有 id、没有返回值字段。** 这是刻意的单向设计，见下文。
+
+#### 分发机制：字符串 → 函数表
+
+两端都用一张 `name → std::function` 的表来分发：
+
+```cpp
+// 服务端注册
+using RPCFunc = std::function<void(Client& client, cJSON* params)>;
+rpc_func_pool["move_left"]  = rpc_move_left;
+rpc_func_pool["move_right"] = rpc_move_right;
+
+// 客户端注册（lambda 捕获局部状态）
+NetManager::instance()->register_rpc("sync", [&](cJSON* params) { ... });
+```
+
+分发时查表调用：
+
+```cpp
+const auto& itor = rpc_func_pool.find(json_func->valuestring);
+if (itor != rpc_func_pool.end())
+    itor->second(client, json_params);   // 找不到就静默丢弃
+```
+
+两个签名差异值得注意：**服务端的处理函数多一个 `Client&` 参数**。因为服务端必须知道"是谁调的"，而客户端只有一条连接，无需区分。这个 `Client&` 就是最朴素的**调用者身份**，也是权限校验该发生的地方。
+
+#### 收包到调用的完整链路
+
+`process_rpc()` 是两端共用的模式：
+
+```
+recv 到 buffer（TCP 字节流，可能粘包/半包）
+   ↓ find_first_of(0x1E) 切分
+   ↓ 找不到分隔符 → buffer = 剩余部分，留到下次
+cJSON_ParseWithLength 解析单条
+   ↓ 校验 type == cJSON_Object
+   ↓ 取 "f" 和 "p"，校验 f 是字符串
+查表 → 调用 → cJSON_Delete 释放
+```
+
+**分隔符 `0x1E`**（ASCII Record Separator）是 TCP 分包方案里最省事的一种：JSON 文本里不会出现这个控制字符，所以无需转义。代价是解析要逐字节扫描，且**二进制协议不能用**（MsgPack 的数据里随时可能出现 0x1E）—— 所以 Demo_7 换 MsgPack 后必须改用长度前缀。
+
+#### 为什么 RPC 不要返回值
+
+`rpc_call()` 的签名是 `void`，发完立即返回。原因在笔记开头已点明，展开说就是：
+
+| 若强行同步等待 | 后果 |
+|---------------|------|
+| 阻塞等对方回包 | 一个 RTT（公网 50~200 ms）内主循环完全停摆，游戏直接卡死 |
+| 中途对方断线 | 永远等不到，需要超时机制 |
+| 多个调用嵌套等待 | 死锁（呼应 Actor 一节的"同步等回复"陷阱） |
+
+正确形态是**把返回值拆成第二次反向调用**：
+
+```
+客户端 rpc_call("buy_item", {id:5})        // 发完就走，UI 先转菊花
+服务端 处理完 → call_client("buy_result", {ok:true, gold:120})
+客户端 buy_result 回调 → 更新 UI
+```
+
+需要一问一答配对时（比如同时买多件），协议里得加一个 **request id**，回包带上同样的 id，客户端用它找到对应的回调。Demo_4 因为全是"发完不管"的单向调用，所以省掉了这个字段。
+
+#### 内存所有权：`auto_gc` 参数
+
+```cpp
+void rpc_call(const char* func, cJSON* params, bool auto_gc = true);
+```
+
+cJSON 是手动内存管理，挂载子节点有两种语义：
+
+| `auto_gc` | 使用的 API | 语义 |
+|-----------|-----------|------|
+| `true`（默认） | `cJSON_AddItemToObject` | **移交所有权**，随外层 `cJSON_Delete` 一起释放 |
+| `false` | `cJSON_AddItemReferenceToObject` | 只挂引用，`params` 由调用方自行管理，可重复使用 |
+
+典型用途：同一份 `params` 要发给多个客户端时用 `false`，避免第一次发送就把它释放掉。这正是 C++ 手写网络层绕不开的活儿 —— 换成 Protobuf/MsgPack 的值语义就没这个负担了。
+
+#### 这个实现的缺陷
+
+作为教学 Demo 足够清晰，但离生产还差这些：
+
+- **无任何鉴权**：任何人都能调任意已注册函数。真实项目需要区分"客户端可调用"和"仅服务端内部"两类，UE 里对应 `Server` / `Client` / `NetMulticast` 修饰
+- **无参数校验**：`params->valueint` 直接取，客户端发个字符串过来就读到脏值。`rpc_move_left` 也没校验频率，可以一秒发一万次
+- **无版本协商**：函数名拼错、参数结构变了，只会静默无效果，不报错
+- **`static char recv_buffer[100MB]`**：单个静态缓冲区，服务端所有连接共用，且 100 MB 直接进 BSS 段，属于典型的"能跑但不该学"的写法
+- **无超时与重试**：TCP 兜住了可靠性，一旦换 UDP 就得自己做
+
+#### 回到那道面试题
+
+极短生命周期对象的完整答案：
+
+1. **不要试图让它进入快照** —— 它的存在时间短于同步间隔，快照必然漏掉
+2. **用 RPC 广播事件**：`fire(shooter_id, dir, timestamp)` 而非同步子弹的每帧位置
+3. **客户端自己演算表现**：收到事件后本地生成子弹、播特效，纯表现层，不影响逻辑
+4. **结果由服务端裁定**：命中与否服务端算完再发 `hit(target_id, damage)`，客户端不许自行判定伤害
+
+这样带宽从"每帧同步 N 颗子弹"降到"每次射击一条消息"，而且**天然解决了子弹在两帧之间生灭的问题** —— 因为传的根本不是状态，是发生过的事实。
+
+一个有返回值Rpc的例子
 
 ## Chapter 3 进阶优化与专项技术
 
 ### 延迟、抖动与丢包
 
- 
+ ### ENet
+
+### ENet实战
+
+### 状态同步优化策略
+
+### 竞技游戏优化策略
+
+### AOI思想详解
+
+### 游戏数据持久化与优化策略
+
+### 游戏更新机制详解
+
+### Lua热更实战
+
+### 调试技术详解
