@@ -28,7 +28,7 @@ Winsock2   粘包拆包   JSON/       JSON-RPC   可靠UDP     MsgPack
 
 ## Chapter1 联机概念与通信基础
 
-### TCP-IP模型
+### TCP-IP
 
 ```
 应用层    ← 用户进程（游戏客户端/服务器逻辑）
